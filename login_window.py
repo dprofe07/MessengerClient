@@ -7,19 +7,21 @@ from PyQt5.QtWidgets import (
     QWidget, QLabel, QLineEdit, QVBoxLayout, QHBoxLayout, QPushButton, QMessageBox
 )
 
-from messenger_api import MessengerAPI
+from messenger_api import MessengerAPI, no_error
 from my_signals import Signals
 
 
 class LoginWindow(QWidget):
+    @no_error
     def __init__(self, application):
         super().__init__()
 
         self.need_update_lbl_info = False
+        self.program_close = False
         self.application = application
 
         self.signal = Signals()
-        self.signal.need_close.connect(self.close)
+        self.signal.need_close.connect(lambda: [setattr(self, 'program_close', True), self.close()])
 
         self.setWindowTitle('Вход')
         self.setFixedWidth(300)
@@ -74,9 +76,10 @@ class LoginWindow(QWidget):
 
         self.setFixedHeight(200)
 
+    @no_error
     def update_lbl_info(self):
         n = 0
-        self.setFixedHeight(self.height() + 20)
+        self.setFixedHeight(220)
         h = self.height()
         self.lbl_info.setVisible(True)
         self.need_update_lbl_info = True
@@ -86,8 +89,9 @@ class LoginWindow(QWidget):
             n = (n + 1) % 5
             self.lbl_info.setText("Входим" + '. ' * n)
         self.lbl_info.setVisible(False)
-        self.setFixedHeight(self.height() - 20)
+        self.setFixedHeight(200)
 
+    @no_error
     def on_click(self):
         login = self.edt_login.text()
         password = self.edt_password.text()
@@ -99,11 +103,15 @@ class LoginWindow(QWidget):
                 pass
             self.need_update_lbl_info = False
             if data['code'] == -1:
-                QMessageBox(QMessageBox.Icon.Critical, "Ошибка", "Нет интернет-соединения", QMessageBox.Ok).exec()
+                QMessageBox(QMessageBox.Warning, "Ошибка", "Нет интернет-соединения").exec()
             elif data['code'] == MessengerAPI.CODE_SUCCESS:
                 self.application.callback_authed(login, password, data['token'])
                 self.signal.need_close.emit()
             elif data['code'] == MessengerAPI.CODE_INCORRECT_PASSWORD:
-                QMessageBox(QMessageBox.Icon.Critical, "Ошибка", "Неверный пароль", QMessageBox.Ok).exec()
+                QMessageBox(QMessageBox.Warning, "Ошибка", "Неверный пароль").exec()
             elif data['code'] == MessengerAPI.CODE_USER_NOT_FOUND:
-                QMessageBox(QMessageBox.Icon.Critical, "Ошибка", "Пользователь не найден", QMessageBox.Ok).exec()
+                QMessageBox(QMessageBox.Warning, "Ошибка", "Пользователь не найден").exec()
+
+    def closeEvent(self, a0):
+        if not self.program_close:
+            exit(0)

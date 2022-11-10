@@ -6,11 +6,12 @@ from PyQt5.QtWidgets import (
 )
 
 from chat import Chat
-from messenger_api import MessengerAPI
+from messenger_api import MessengerAPI, no_error
 from my_signals import Signals
 
 
 class ChatsWindow(QWidget):
+    @no_error
     def __init__(self, application):
         super().__init__()
 
@@ -74,21 +75,26 @@ class ChatsWindow(QWidget):
 
         self.setMinimumSize(700, 400)
 
+    @no_error
     def run(self):
         self.lbl_my_login.setText(f"Вы вошли как {self.application.login}")
 
         self.show()
         Thread(target=self.load_chats).start()
 
+    @no_error
     def add_dialog(self):
         login = self.edt_companion_login.text()
+        self.edt_companion_login.setText('')
         if login == '' or ';' in login:
             return
-        res = MessengerAPI.create_chat(self.application.token, f'DIALOG_BETWEEN/{self.application.login};{login}', login, '')
-        if res['code'] == 0:
-            self.edt_companion_login.setText('')
+        res = MessengerAPI.create_dialog(self.application.token, login)
+        if res['code'] == MessengerAPI.CODE_SUCCESS:
             self.update_chats_time = 0
+        elif res['code'] == MessengerAPI.CODE_USER_NOT_FOUND:
+            QMessageBox(QMessageBox.Warning, 'Ошибка', f'Пользователь с логином {login} не найден').exec()
 
+    @no_error
     def update_chats_ui(self):
         self.lst_chats.clear()
 
@@ -98,21 +104,24 @@ class ChatsWindow(QWidget):
 
         self.lst_chats.setCurrentRow(self.current_chat_pos)
 
+    @no_error
     def no_internet_connection(self):
         print('No internet connection')
         self.lbl_my_login.setText(self.lbl_my_login.text() + '\nНет интернета!')
 
-    def send_message(self):
+    @no_error
+    def send_message(self, e=None):
         text = self.edt_msg.text()
+        self.edt_msg.setText('')
         res = MessengerAPI.send_message(self.application.token, self.chats[self.current_chat_pos].id, text)
         if res['code'] == -1:
-            QMessageBox(QMessageBox.Icon.Warning, "Ошибка", "Нет интернет-соединения").show()
+            QMessageBox(QMessageBox.Warning, "Ошибка", "Нет интернет-соединения").exec()
         elif res['code'] != 0:
-            QMessageBox(QMessageBox.Icon.Critical, "Ошибка", f'Не отправляется сообщение с кодом {res["code"]}').show()
+            QMessageBox(QMessageBox.Warning, "Ошибка", f'Не отправляется сообщение с кодом {res["code"]}').show()
         else:
             self.update_chats_time = 0
-            self.edt_msg.setText('')
 
+    @no_error
     def load_chats(self):
         while self.need_load_chats:
             if time.time() < self.update_chats_time + 10:
@@ -155,7 +164,10 @@ class ChatsWindow(QWidget):
 
             self.signal.update_chats.emit()
 
+    @no_error
     def on_chat_click(self, pos):
+        if pos == -1:
+            return
         try:
             self.lbl_current_chat.setText(self.chats[pos].show_name)
         except (KeyError, IndexError) as e:
@@ -168,3 +180,10 @@ class ChatsWindow(QWidget):
         for msg in self.chats[pos].messages:
             item = QListWidgetItem(f"[{msg.sender_login}] {msg.text}")
             self.lst_messages.addItem(item)
+
+        self.lst_messages.scrollToBottom()
+
+    def closeEvent(self, a0):
+        self.need_load_chats = False
+        time.sleep(0.2)
+        exit(0)

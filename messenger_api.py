@@ -1,5 +1,23 @@
+import functools
+
 import requests
-import urllib3.exceptions
+
+
+def no_error(fn):
+    return no_error_default_value(None)(fn)
+
+
+def no_error_default_value(value):
+    def decorator(fn):
+        @functools.wraps(fn)
+        def wrapper(*a, **kw):
+            try:
+                return fn(*a, **kw)
+            except Exception as e:
+                print(f'[no_error decorator caught exception {type(e).__name__} in {fn.__name__}]: {e.args[0]})')
+                return value
+        return wrapper
+    return decorator
 
 
 class MessengerAPI:
@@ -17,6 +35,7 @@ class MessengerAPI:
     CODE_DO_NOT_NEED_UPDATE = 8
 
     @staticmethod
+    @no_error_default_value({'code': -2})
     def get_token(login, password):
         try:
             req = requests.get(MessengerAPI.URL + '/get-token', {'login': login, 'password': password})
@@ -25,6 +44,7 @@ class MessengerAPI:
         return req.json()
 
     @staticmethod
+    @no_error_default_value({'code': -2})
     def get_chats(token):
         try:
             req = requests.get(MessengerAPI.URL + '/get-chats', {'token': token})
@@ -33,6 +53,7 @@ class MessengerAPI:
         return req.json()
 
     @staticmethod
+    @no_error_default_value({'code': -2})
     def get_messages(token, chat_id):
         try:
             req = requests.get(MessengerAPI.URL + '/chat', {'token': token, 'chat-id': chat_id})
@@ -41,6 +62,7 @@ class MessengerAPI:
         return req.json()
 
     @staticmethod
+    @no_error_default_value({'code': -2})
     def send_message(token, chat_id, text):
         try:
             req = requests.get(MessengerAPI.URL + '/send-message', {'token': token, 'chat-id': chat_id, 'text': text})
@@ -49,6 +71,7 @@ class MessengerAPI:
         return req.json()
 
     @staticmethod
+    @no_error_default_value({'code': -2})
     def sign_up(login, password, keyword):
         try:
             req = requests.get(MessengerAPI.URL + '/signup', {'login': login, 'password': password, 'keyword': keyword})
@@ -57,9 +80,10 @@ class MessengerAPI:
         return req.json()
 
     @staticmethod
-    def create_chat(token, name, members, password):
+    @no_error_default_value({'code': -2})
+    def create_dialog(token, companion_login):
         try:
-            req = requests.get(MessengerAPI.URL + '/create-chat', {'token': token, 'password': password, 'members': members, 'name': name})
+            req = requests.get(MessengerAPI.URL + '/create-dialog', {'token': token, 'companion-login': companion_login})
         except requests.exceptions.ConnectionError:
             return {'code': -1}
         return req.json()

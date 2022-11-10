@@ -1,7 +1,8 @@
 from message import Message
-from messenger_api import MessengerAPI
+from messenger_api import MessengerAPI, no_error
 
 
+@no_error
 class Chat:
     def __init__(self, application, id_, name, members, time_last_message=0):
         self.application = application

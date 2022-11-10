@@ -7,19 +7,21 @@ from PyQt5.QtWidgets import (
     QWidget, QLabel, QLineEdit, QVBoxLayout, QHBoxLayout, QPushButton, QMessageBox
 )
 
-from messenger_api import MessengerAPI
+from messenger_api import MessengerAPI, no_error
 from my_signals import Signals
 
 
 class SignUpWindow(QWidget):
+    @no_error
     def __init__(self, application):
         super().__init__()
 
         self.need_update_lbl_login = False
         self.application = application
+        self.program_close = False
 
         self.signal = Signals()
-        self.signal.need_close.connect(self.close)
+        self.signal.need_close.connect(lambda: [setattr(self, 'program_close', True), self.close()])
 
         self.setWindowTitle('Регистрация')
         self.setFixedWidth(300)
@@ -96,28 +98,31 @@ class SignUpWindow(QWidget):
 
         self.setFixedHeight(250)
 
+    @no_error
     def update_lbl_info(self):
         n = 0
-        self.setFixedHeight(self.height() + 20)
-        h = self.height()
+        self.setFixedHeight(270)
         self.lbl_info.setVisible(True)
         self.need_update_lbl_login = True
 
         while self.need_update_lbl_login:
             time.sleep(0.1)
             n = (n + 1) % 5
-            self.lbl_info.setText("Входим" + '. ' * n)
+            self.lbl_info.setText("Регистрация" + '. ' * n)
         self.lbl_info.setVisible(False)
-        self.setFixedHeight(self.height() - 20)
+        self.setFixedHeight(250)
 
+    @no_error
     def on_click(self):
         login = self.edt_login.text()
         password = self.edt_password.text()
         password2 = self.edt_password2.text()
         keyword = self.edt_keyword.text()
         if ';' in login:
-            QMessageBox(QMessageBox.Icon.Warning, "Ошибка", "Нельзя использовать точку с запятой в логине", QMessageBox.Ok).exec()
-        if login != '' and password != '' and keyword != '' and password2 == password:
+            QMessageBox(QMessageBox.Icon.Warning, "Ошибка", "Нельзя использовать точку с запятой в логине").exec()
+        if password2 != password:
+            QMessageBox(QMessageBox.Warning, "Ошибка", "Пароли не совпадают").exec()
+        if login != '' and password != '' and keyword != '':
             Thread(target=self.update_lbl_info).start()
             t = time.time()
             data = MessengerAPI.sign_up(login, password, keyword)
@@ -127,9 +132,14 @@ class SignUpWindow(QWidget):
             self.need_update_lbl_login = False
 
             if data['code'] == -1:
-                QMessageBox(QMessageBox.Icon.Critical, "Ошибка", "Нет интернет-соединения", QMessageBox.Ok).exec()
+                QMessageBox(QMessageBox.Icon.Warning, "Ошибка", "Нет интернет-соединения").exec()
             elif data['code'] == MessengerAPI.CODE_USER_ALREADY_EXISTS:
-                QMessageBox(QMessageBox.Icon.Critical, "Ошибка", "Этот логин уже занят", QMessageBox.Ok).exec()
+                QMessageBox(QMessageBox.Icon.Warning, "Ошибка", "Этот логин уже занят").exec()
             elif data['code'] == MessengerAPI.CODE_SUCCESS:
                 self.application.callback_authed(login, password, data['token'])
                 self.signal.need_close.emit()
+
+    @no_error
+    def closeEvent(self, a0):
+        if not self.program_close:
+            exit(0)
